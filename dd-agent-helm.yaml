@@ -1,0 +1,86 @@
+datadog:
+  datadog:
+    # apiKeyExistingSecret: existing-secret
+    apiKey: "some-dummy-key"
+    clusterName: "nas-test"
+    dd_url: "http://ddagent.polaris-vector-metrics.svc.cluster.local:8006"
+    site: "http://ddagent.polaris-vector-metrics.svc.cluster.local:8006"
+    kubelet:
+      tlsVerify: false
+    env:
+      - name: DD_HOSTNAME
+        value: "datadog-agent"
+      - name: DD_DD_URL
+        value: "http://ddagent.polaris-vector-metrics.svc.cluster.local:8006"
+    apm:
+      portEnabled: false
+      socketEnabled: false
+      enabled: false
+    networkMonitoring:
+      enabled: false
+    dogstatsd:
+      useHostPort: false
+
+    # NOTE: needed to use Kube State Metrics 2.
+    # https://github.com/DataDog/helm-charts/pull/623#issuecomment-1128782060
+    kubeStateMetricsEnabled: false
+    kubeStateMetricsCore:
+      enabled: true
+      rbac:
+        create: true
+      labelsAsTags:
+        pod:
+          snyk.io/owner: "polaris.owner"
+        horizontalPodAutoscaler:
+          snyk.io/owner: "polaris.owner"
+
+      ignoreLegacyKSMCheck: true
+      useClusterCheckRunners: false
+    clusterChecks:
+      enabled: false
+    helmCheck:
+      enabled: true
+      collectEvents: true
+    processAgent:
+      enabled: false
+
+    podLabelsAsTags:
+      snyk.io/owner: "polaris.owner"
+
+  clusterAgent:
+    image:
+      source_repository: gcr.io/datadoghq/cluster-agent
+      repository: gcr.io/snyk-main/datadog-cluster-agent
+      tag: 7.43.1
+    admissionController:
+      enabled: true
+      mutateUnlabelled: false
+    additionalLabels:
+      snyk.io/owner: "sre"
+    podAnnotations:
+      sidecar.istio.io/inject: "false"
+
+  # Configure agent for Vector
+  agents:
+    image:
+      source_repository: gcr.io/datadoghq/agent
+      repository: gcr.io/snyk-main/datadog-agent
+      tag: 7.43.1
+    useConfigMap: true
+    customAgentConfig:
+      kubelet_tls_verify: false
+      vector:
+        metrics:
+          enabled: true
+          url: "http://ddagent.polaris-vector-metrics.svc.cluster.local:8006"
+        logs:
+          enabled: false
+        traces:
+          enabled: false
+    additionalLabels:
+      snyk.io/owner: "sre"
+    podAnnotations:
+      sidecar.istio.io/inject: "false"
+    tolerations:
+      - effect: NoSchedule
+        operator: Exists
