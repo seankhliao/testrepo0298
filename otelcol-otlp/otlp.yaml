@@ -1,0 +1,64 @@
+receivers:
+  # otlp receiver
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+
+processors:
+  transform/tag-pipeline-otlp:
+    metric_statements:
+      - context: resource
+        statements:
+          - 'set(attributes["polaris.metrics.collector"], "otelcol-push")'
+          - 'set(attributes["polaris.metrics.receiver"], "otlp")'
+
+  # ignore all traces/spans we might receive
+  filter/drop-all:
+    spans:
+      include:
+        match_type: strict
+        services:
+          - no-service-should-match
+
+exporters:
+  # polaris-vector-metrics otelcol_otlp
+  datadog/vector-otlp:
+    api:
+      site: push.polaris-vector-metrics.svc.cluster.local:8002
+      key: required-field-but-not-used
+    metrics:
+      endpoint: http://push.polaris-vector-metrics.svc.cluster.local:8002
+      resource_attributes_as_tags: true
+      instrumentation_scope_metadata_as_tags: true
+    host_metadata:
+      enabled: false
+
+  # shouldn't output anything, for the traces pipeline
+  logging/drop-all:
+    loglevel: error
+    sampling_initial: 1
+
+service:
+  pipelines:
+    # main export pipeline
+    metrics/otlp:
+      receivers:
+        - forward/self
+        - otlp
+      processors:
+        - k8sattributes
+        - cumulativetodelta
+        - transform/tag-pipeline-otlp
+        - batch
+      exporters:
+        - datadog/vector-otlp
+
+    # register a trace pipeline so code sdks don't complain about unimplemented services
+    traces/drop-all:
+      receivers:
+        - otlp
+      processors:
+        - filter/drop-all
+      exporters:
+        - logging/drop-all

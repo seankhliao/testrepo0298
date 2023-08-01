@@ -1,0 +1,9 @@
+transforms:
+  remap_internal:
+    type: remap
+    drop_on_abort: true
+    drop_on_error: true
+    reroute_dropped: true
+    inputs:
+      - internal_metrics
+    file: "${VRL_DIR}/1-remap-internal.vrl"

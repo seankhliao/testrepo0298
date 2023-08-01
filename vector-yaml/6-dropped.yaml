@@ -1,0 +1,32 @@
+transforms:
+  dropped_to_log:
+    type: metric_to_log
+    inputs:
+      - remap_internal.dropped
+      - remap_k8s_dd_agent.dropped
+      - remap_main.dropped
+      - uuid_finder.dropped
+      - standard_names.dropped
+      - series_to_drop.dropped
+      - remove_standard_tags.dropped
+      - specialcase_to_drop.dropped
+    host_tag: polaris-vector-metrics
+    timezone: UTC
+
+  dropped_log_value:
+    type: remap
+    inputs:
+      - dropped_to_log
+    source: .value = 1
+
+  dropped_to_metric:
+    type: log_to_metric
+    inputs:
+      - dropped_log_value
+    metrics:
+      - type: counter
+        name: polaris.vector.metrics.processing.dropped
+        field: value
+        tags:
+          polaris.vector.dropped.component_id: '{{tags."metadata.dropped.component_id"}}'
+          polaris.vector.dropped.reason: '{{tags."metadata.dropped.reason"}}'

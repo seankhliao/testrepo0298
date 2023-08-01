@@ -1,0 +1,55 @@
+.tags = object!(.tags || {})
+
+service = compact([
+    .tags."k8s.app.name",
+    .tags."service.name",
+    .tags."k8s.statefulset.name",
+    .tags."k8s.daemonset.name",
+    .tags."k8s.deployment.name",
+    .tags."k8s.cronjob.name",
+    .tags."service",
+    "unknown",
+])[0]
+if service == "unknown" && exists(.tags."k8s.job.name") {
+    # Strip if it was really a UUID
+    service = .tags."k8s.job.name"
+    stripped_service, err = replace(service, r'(?P<service>.+)(?P<uuid>(-[a-f0-9]+){5})$', "$service")
+    if err == null {
+      service = stripped_service
+    }
+    # Strip if there's a single appended random number
+    stripped_service, err = replace(service, r'(?P<service>.+)(?P<id>(-[0-9]+))$', "$service")
+    if err == null {
+      service = stripped_service
+    }
+}
+
+keep_tags = {
+    # Datadog Standard tags
+    "service":  service,
+    "host":     .tags."k8s.namespace.name",
+    "version":  .tags."container.image.tag",
+
+    # Origin Identifiers
+    "namespace":            .tags."k8s.namespace.name",  # legacy
+    "k8s.namespace.name":   .tags."k8s.namespace.name",
+    "container.image.name": .tags."container.image.name",
+    "container.image.tag":  .tags."container.image.tag",
+
+    # Polaris tags
+    "polaris.owner":              .tags."polaris.owner" || "unknown",
+    "polaris.metrics.collector":  .tags."polaris.metrics.collector",
+    "polaris.metrics.receiver":   .tags."polaris.metrics.receiver",
+
+    # Other
+    # keep this as a uniqueness key for gauges
+    "k8s.pod.uid": .tags."k8s.pod.uid",
+}
+
+# replace uuids in values
+.tags = map_values(.tags) -> |value| {
+    replace!(value, r'[a-zA-Z0-9]{8}(-[a-zA-Z0-9]{4}){3}-[a-zA-Z0-9]{12}', "_uuid_", -1)
+}
+
+# overwrite with original keep_tags
+.tags = merge(.tags, keep_tags)

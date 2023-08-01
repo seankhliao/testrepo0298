@@ -1,0 +1,52 @@
+# Datadog standard tags
+service = compact([
+    .tags."service",
+    .tags."kube_app_name",
+    .tags."kube_stateful_set",
+    .tags."kube_daemon_set",
+    .tags."kube_deployment",
+    .tags."kube_cronjob",
+    .tags."horizontalpodautoscaler", # used for kubernetes_state.hpa.* metrics
+    .tags."kube_service",
+    "unknown",
+])[0]
+
+
+if service == "unknown" && exists(.tags."kube_job_name") {
+    # Strip if it was really a UUID
+    service = .tags."kube_job_name"
+    # Probably don't need to do this as these are integration metrics
+    # and don't have the same cardinality concerns as custom metrics
+    stripped_service, err = replace(service, r'(?P<service>.+)(?P<uuid>(-[a-f0-9]+){5})$', "$service")
+    if err == null {
+      service = stripped_service
+    }
+    # Strip if there's a single appended random number
+    stripped_service, err = replace(service, r'(?P<service>.+)(?P<id>(-[0-9]+))$', "$service")
+    if err == null {
+      service = stripped_service
+    }
+}
+
+# Metrics under system and datadog namespaces are not service and namespace specific
+if .namespace != "system" && .namespace != "datadog" {
+  .tags.service   = service
+
+  .tags.version   = .tags."image_tag"
+
+  # Origin identifiers
+  .tags.namespace = .tags."kube_namespace" || "unknown"
+}
+
+.tags.host      = .tags.host || .tags."kube_namespace" || "unknown"
+
+# Polaris tags
+.tags."polaris.owner"  = .tags."polaris.owner" || "unknown"
+
+.tags."polaris.metrics.collector" = "dd-agent"
+
+# Add kube_cluster_name tag if it doesn't exist. This is used by Datadog to popoulate the "Infrastructure" views
+if .tags.kube_cluster_name == null {
+  .tags.kube_cluster_name =  get_env_var!("POLARIS_INSTANCE")
+  .tags.cluster_name =  .tags.kube_cluster_name
+}

@@ -1,0 +1,51 @@
+receivers:
+  # self metrics
+  prometheus/self:
+    config:
+      scrape_configs:
+        - job_name: otelcol-self
+          scrape_interval: 5s
+          static_configs:
+            - targets:
+                - 127.0.0.1:8888
+
+processors:
+  # set a key for pod association,
+  # necessary because we loopback
+  resource/self-ip:
+    attributes:
+      - key: k8s.pod.ip
+        value: ${POD_IP}
+        action: insert
+
+  # we don't need this label, it's a uuid
+  transform/cleanup-self:
+    metric_statements:
+      - context: datapoint
+        statements:
+          - delete_key(attributes, "service_instance_id")
+
+connectors:
+  forward/self:
+
+service:
+  pipelines:
+    # loopback self metrics
+    metrics/self:
+      receivers:
+        - prometheus/self
+      processors:
+        - resource/self-ip
+        - cumulativetodelta
+        - transform/cleanup-self
+      exporters:
+        - forward/self
+
+  telemetry:
+    logs:
+      level: error
+      encoding: json
+      disable_stacktrace: true
+    metrics:
+      level: normal
+      address: 0.0.0.0:8888

@@ -1,0 +1,29 @@
+sources:
+  # polaris-otelcol-* instances talk to vector using the datadog protocol
+  # Turn api key storage off -- If this is set to true, vector tries to reuse creds from the event which may not always be present or valid
+  # This results in a lot of 403 - forbidden errors and eventually exhausting the connection pool
+  otelcol_otlp:
+    type: datadog_agent
+    address: 0.0.0.0:8002
+    store_api_key: false
+  otelcol_prom:
+    type: datadog_agent
+    address: 0.0.0.0:8003
+    store_api_key: false
+  otelcol_statsd:
+    type: datadog_agent
+    address: 0.0.0.0:8004
+    store_api_key: false
+  # Used to receive k8s metrics from the Datadog agent
+  dd_agent_k8s:
+    type: datadog_agent
+    address: 0.0.0.0:8006
+    store_api_key: false
+    disable_logs: true
+    disable_traces: true
+    disable_metrics: false
+    multiple_outputs: true
+
+  internal_metrics:
+    type: internal_metrics
+    scrape_interval_secs: 10

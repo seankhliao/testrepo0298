@@ -1,0 +1,90 @@
+transforms:
+  system_bypass_owner:
+    type: route
+    inputs:
+      - series_to_drop_filter
+    route:
+      # Bypass everything coming from dd-agent. Filter this later into separate routes
+      # e.g. all pod level metrics should have service and owner.
+      ddagent: |
+        .tags."polaris.metrics.collector" == "dd-agent"
+
+  ensure_service:
+    type: route
+    inputs:
+      - system_bypass_owner._unmatched
+    route:
+      accepted: |
+        exists(.tags.service) && .tags.service != "unknown"
+  rejected_service_to_log:
+    type: metric_to_log
+    inputs:
+      - ensure_service._unmatched
+    host_tag: polaris-vector-metrics
+    timezone: UTC
+  rejected_service_log_value:
+    type: remap
+    inputs:
+      - rejected_service_to_log
+    source: .value = 1
+  rejected_service_to_metric:
+    type: log_to_metric
+    inputs:
+      - rejected_service_log_value
+    metrics:
+      - type: counter
+        name: app.metric.validation.failure
+        field: value
+        tags:
+          metric.name: "{{name}}"
+          polaris.vector.reject.reason: "missing-service"
+
+  ensure_owner:
+    type: route
+    inputs:
+      - ensure_service.accepted
+    route:
+      accepted: |
+        exists(.tags."polaris.owner") && .tags."polaris.owner" != "unknown"
+  rejected_owner_to_log:
+    type: metric_to_log
+    inputs:
+      - ensure_owner._unmatched
+    host_tag: polaris-vector-metrics
+    timezone: UTC
+  rejected_owner_log_value:
+    type: remap
+    inputs:
+      - rejected_owner_to_log
+    source: |
+      .value = 1
+  rejected_owner_to_metric:
+    type: log_to_metric
+    inputs:
+      - rejected_owner_log_value
+    metrics:
+      - type: counter
+        name: app.metric.validation.failure
+        field: value
+        tags:
+          service: "{{tags.service}}"
+          metric.name: "{{name}}"
+          polaris.vector.reject.reason: "missing-owner"
+
+  system_bypass_tags:
+    type: route
+    inputs:
+      - system_bypass_owner.ddagent
+      - ensure_owner.accepted
+    route:
+      system_metrics: |
+        .tags."polaris.metrics.collector" == "dd-agent"
+
+  remove_standard_tags:
+    type: remap
+    drop_on_abort: true
+    drop_on_error: true
+    reroute_dropped: true
+    inputs:
+      - system_bypass_tags._unmatched
+    file: "${VRL_DIR}/4-filter-tags.vrl"

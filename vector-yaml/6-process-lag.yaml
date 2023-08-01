@@ -1,0 +1,23 @@
+transforms:
+  process_lag_to_log:
+    type: metric_to_log
+    inputs:
+      - specialcase_to_drop_filter
+    host_tag: polaris-vector-metrics
+    timezone: UTC
+
+  process_lag_log_value:
+    type: remap
+    inputs:
+      - process_lag_to_log
+    source: |
+      .lag_seconds = to_float(now()) - to_float(parse_timestamp!(.timestamp, "%FT%TZ%:z"))
+
+  process_lag_to_metric:
+    type: log_to_metric
+    inputs:
+      - process_lag_log_value
+    metrics:
+      - type: histogram
+        name: polaris.vector.metrics.processing.lag
+        field: lag_seconds

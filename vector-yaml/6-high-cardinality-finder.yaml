@@ -1,0 +1,40 @@
+transforms:
+  uuid_finder:
+    type: remap
+    drop_on_abort: true
+    drop_on_error: true
+    reroute_dropped: true
+    inputs:
+      - specialcase_to_drop_filter
+    file: "${VRL_DIR}/6-high-cardinality-finder.vrl"
+
+  uuid_finder_filter:
+    type: filter
+    inputs:
+      - uuid_finder
+    condition: |
+      exists(.tags.high_cardinality)
+
+  uuid_finder_to_log:
+    type: metric_to_log
+    inputs:
+      - uuid_finder_filter
+    host_tag: polaris-vector-metrics
+    timezone: UTC
+  uuid_finder_log_value:
+    type: remap
+    inputs:
+      - uuid_finder_to_log
+    source: |
+      . = parse_json!(.tags.high_cardinality)
+
+  uuid_finder_to_metric:
+    type: log_to_metric
+    inputs:
+      - uuid_finder_log_value
+    metrics:
+      - type: counter
+        name: polaris.vector.metrics.highcardinality.keys
+        field: value
+        tags:
+          key: "{{tag}}"

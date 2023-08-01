@@ -1,0 +1,28 @@
+.tags, err = object(.tags)
+if err != null {
+    .tags = {}
+}
+
+.name = string!(.name)
+
+if exists(.namespace) {
+    .name = string!(.namespace) + "." + .name
+    del(.namespace)
+}
+
+# Skip formatting tags for k8s metrics coming from the Datadog Agent.
+if .tags."polaris.metrics.collector" != "dd-agent" {
+  # tag key camelCase to dotted.case
+  .tags = map_keys(.tags, false) -> |key| {
+      downcase(replace(key, r'(?P<low>[a-z])(?P<up>[A-Z])', "${low}.${up}"))
+  }
+   # tag key snake_case to dotted.case
+  .tags = map_keys(.tags) -> |key| {
+      downcase(replace(key, "_", "."))
+    }
+  # metric name camelCase to dotted.case
+  .name = replace(.name, r'(?P<low>[a-z])(?P<up>[A-Z])', "${low}.${up}")
+  .name = downcase(.name)
+  # metric name snake_case to dotted.case
+  .name = replace(.name, "_", ".")
+}

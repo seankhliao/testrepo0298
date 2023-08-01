@@ -1,0 +1,21 @@
+.tags = merge!(.tags || {}, {
+    # Datadog standard tags
+    "service": get_env_var!("VECTOR_APP_NAME"),
+    "host": "polaris-vector-metrics",
+    "version": get_env_var!("CONTAINER_IMAGE_TAG"),
+
+    # Origin identifiers
+    "k8s.namespace.name": "polaris-vector-metrics",
+    "container.image.name": get_env_var!("CONTAINER_IMAGE_NAME"),
+    "container.image.tag": get_env_var!("CONTAINER_IMAGE_TAG"),
+
+    # Polaris tags
+    "polaris.owner": "sre",
+
+    # Other
+    "vector.role": "metrics-aggregator",
+})
+
+if .type == "gauge" {
+    .tags."k8s.pod.uid" = get_env_var!("VECTOR_SELF_POD_UID")
+}

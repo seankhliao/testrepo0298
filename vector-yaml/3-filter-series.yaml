@@ -1,0 +1,16 @@
+transforms:
+  series_to_drop:
+    type: remap
+    drop_on_abort: true
+    drop_on_error: true
+    reroute_dropped: true
+    inputs:
+      - standard_names
+    file: "${VRL_DIR}/3-filter-series.vrl"
+
+  series_to_drop_filter:
+    type: filter
+    inputs:
+      - series_to_drop
+    condition: |
+      !exists(.tags.__should_drop)

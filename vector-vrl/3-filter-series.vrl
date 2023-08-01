@@ -1,0 +1,144 @@
+# Experiment: https://snyksec.atlassian.net/browse/SRE-1885
+#
+# It is our hypothesis that distribution metrics (histograms) don't need
+# the extra cardinality to uniquely identify pods, to still remain useful.
+#
+# This code filters out a high-cardinality tag, based on the metric type.
+# In the future, other logic might be used here,
+# e.g. based on the origin of the metric
+
+# This metric's `.type` string is hardcoded in the core sourcecode of vector
+# https://github.com/vectordotdev/vector/blob/master/lib/vector-core/src/event/metric/value.rs
+if .type != "gauge" {
+  del(.tags."k8s.pod.uid")
+}
+
+# We can determine if a metric is being used, by listing it's active tags
+# https://github.com/snyk/datadog-metrics-usage-api
+#
+# If a metric isn't being used, but it appears at the top of the Usage page,
+# add it to this list to filter it out.
+# https://app.datadoghq.com/billing/usage?category=custom-metrics
+explicit_excludes = [
+  "datadog.exporter.metrics.running",
+  "http.server.duration",
+  "k8s.pod.phase",
+  "net.conntrack.dialer.conn.failed.total",
+  "opentelemetry.allocator.targets",
+  "otel.datadog_exporter.metrics.running",
+  "process.start.time.seconds",
+
+  # Temporal
+  "task.queue.started",
+  "task.queue.stopped",
+  "syncmatch.latency",
+  "condition.failed.errors",
+  "client.redirection.errors",
+  "client.redirection.latency",
+  "client.redirection.requests",
+  "service.latency.userlatency"
+]
+
+explicit_allows = [
+  "go.gc.duration.seconds.count",
+  "go.gc.duration.seconds.sum",
+  # Oddly, this metric is scraped as `go_gc_duration_seconds{quantile="0"}`, without the `le` label
+  # and so is not being translated into a distribution metric
+  #"go.gc.duration.seconds.quantile", not permitting this metric, since it is a gauge.
+
+  "go.threads",                     # used tags: polaris.instance, service, k8s.pod.uid
+  "go.memstats.heap.objects",       # used tags: polaris.instance, service, k8s.pod.uid
+  "go.memstats.heap.sys.bytes",     # used tags: polaris.instance, service, k8s.pod.uid
+  "go.memstats.heap.inuse.bytes",   # used tags: polaris.instance, service, k8s.pod.uid
+
+  "k8s.pod.filesystem.available",   # used tags: polaris.instance, namespace, service
+  "k8s.pod.memory.working.set",     # used tags: polaris.instance, namespace, host, service
+  "k8s.volume.available",           # used, but only permitted for PVCs
+  "k8s.volume.capacity",            # used, but only permitted for PVCs
+
+  "nodejs.heap.space.size.used.bytes", # used tags: polaris.instance, service, space, kube.deployment
+  "nodejs.eventloop.lag.p99.seconds",
+
+  "pgbouncer.up",
+  "pgbouncer.databases.pool.size",
+  "pgbouncer.databases.reserve.pool",
+  "pgbouncer.pools.client.active.connections",
+  "pgbouncer.pools.client.maxwait.seconds",
+  "pgbouncer.pools.client.waiting.connections",
+  "pgbouncer.pools.server.active.connections",
+  "pgbouncer.pools.server.idle.connections",
+  "pgbouncer.stats.client.wait.seconds.total",
+  "pgbouncer.stats.queries.pooled.total",
+  "pgbouncer.stats.queries.duration.seconds.total",
+  "pgbouncer.stats.received.bytes.total",
+  "pgbouncer.stats.sent.bytes.total",
+  "pgbouncer.stats.sql.transactions.pooled.total",
+
+  "pg.database.size.bytes",
+  "pg.locks.count",
+  "pg.stat.vacuum.progress",
+  "pg.logical.slot.flush.lsn.distance",
+  "pg.logical.streaming.state",
+  "pg.replication.slots.pg.wal.lsn.diff",
+  "pg.settings.max.connections",
+  "pg.settings.rds.check.extension.connections",
+  "pg.stat.activity.max.tx.duration",
+  "pg.stat.database.blk.read.time",
+  "pg.stat.database.blks.hit",
+  "pg.stat.database.blks.read",
+  "pg.stat.database.blk.write.time",
+  "pg.stat.database.conflicts",
+  "pg.stat.database.deadlocks",
+  "pg.stat.database.numbackends",
+  "pg.stat.database.temp.files",
+  "pg.stat.database.tup.deleted",
+  "pg.stat.database.tup.fetched",
+  "pg.stat.database.tup.inserted",
+  "pg.stat.database.tup.returned",
+  "pg.stat.database.tup.updated",
+  "pg.stat.database.xact.commit",
+  "pg.stat.database.xact.rollback",
+  "pg.stat.user.tables.idx.scan",
+  "pg.stat.user.tables.n.dead.tup",
+  "pg.stat.user.tables.n.live.tup",
+  "pg.stat.user.tables.n.tup.del",
+  "pg.stat.user.tables.n.tup.hot.upd",
+  "pg.stat.user.tables.n.tup.ins",
+  "pg.stat.user.tables.n.tup.upd",
+  "pg.wraparoud.used.xid.ratio",
+  "pg.xmin.age.backend.nonvac",
+  "pg.xmin.age.repl",
+  "pg.xmin.age.repl.catalog",
+
+  "probe.success",
+]
+
+default_exclude_prefixes = [
+  "api.endpoint.response.time.ms..",
+  "go.",
+  "k8s.pod.filesystem.",
+  "k8s.pod.memory.",
+  "k8s.pod.network.",
+  "k8s.volume.",
+  "nodejs.",
+  "pgbouncer.",
+  "probe.",
+  "pvdb.nodejs.",
+  "scrape.",
+]
+
+default_exclude_suffixes = [
+  ".amazonaws.com.443.total.match.count",
+]
+
+if includes(explicit_excludes, .name) {
+    .tags.__should_drop = "true"
+} else if includes(explicit_allows, .name) {
+    # noop, we keep these
+    # can't have an empty branch
+    true
+} else if includes(map_values(default_exclude_prefixes) -> |p| { starts_with!(.name, p) }, true) {
+    .tags.__should_drop = "true"
+} else if includes(map_values(default_exclude_suffixes) -> |p| { ends_with!(.name, p) }, true) {
+	.tags.__should_drop = "true"
+}

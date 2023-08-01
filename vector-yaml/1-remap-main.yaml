@@ -1,0 +1,13 @@
+# We require every metrics to have an `polaris.owner`` and `service` tags.
+# We'll need to work out how to inject `polaris.owner`` and `service` tags automatically.`
+transforms:
+  remap_main:
+    type: remap
+    drop_on_abort: true
+    drop_on_error: true
+    reroute_dropped: true
+    inputs:
+      - otelcol_otlp
+      - otelcol_prom
+      - otelcol_statsd
+    file: "${VRL_DIR}/1-remap-main.vrl"

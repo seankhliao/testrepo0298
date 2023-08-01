@@ -1,0 +1,70 @@
+# special cases of metrics we should partially drop
+
+.name = string!(.name)
+
+# drop system metrics from golang-deps-job
+# the team doesn't use these, and they generate a lot of jobs
+if .tags.service == "golang-deps-job" {
+    if starts_with(.name, "k8s.") || starts_with(.name, "container.") {
+        .tags.__should_drop = "true"
+    }
+}
+
+# drop volume metrics that are not for persistent volumes
+if starts_with(.name, "k8s.volume.") {
+    if !exists(.tags."k8s.persistentvolumeclaim.name") {
+        .tags.__should_drop = "true"
+    }
+}
+
+# drop pod filesystem metrics for cronjobs
+# this is implemented as an allow list for long-running services only
+if starts_with(.name, "k8s.pod.filesystem.") {
+	if !exists(.tags."k8s.deployment.name") && !exists(.tags."k8s.daemonset.name") && !exists(.tags."k8s.statefulset.name") {
+		.tags.__should_drop = "true"
+	}
+}
+
+# drop the whole metric for applicatios with a high cardinality container name
+#
+# e.g. "eval-01ayqkld1pq0godkghr7e5eqr"
+# Which is being set by the cloud-scan-engine, owned by cloud-engines
+if .tags.namespace == "cloud-scan-engine" {
+	container_name = string!(.tags."k8s.container.name")
+    if starts_with(container_name, "eval-") {
+        .tags.__should_drop = "true"
+    }
+}
+
+# drop high cardinality nodejs heap metrics for teams that don't use them in any dashboard
+#
+# List of dashboards
+# Team Education
+# - https://app.datadoghq.com/dashboard/49i-tux-ins
+# - https://app.datadoghq.com/dashboard/n5j-sdr-57n
+# - https://app.datadoghq.com/dashboard/fzv-hge-6kr
+# - https://app.datadoghq.com/dashboard/kc5-yrt-5gs
+#
+# Team Link
+# - https://app.datadoghq.com/dashboard/ihb-m7v-8wc
+# - https://app.datadoghq.com/dashboard/ins-mqp-k8p
+if .name == "nodejs.heap.space.size.used.bytes" {
+	owner = string!(.tags."polaris.owner")
+	if !includes(["education", "link"], owner) {
+		.tags.__should_drop = "true"
+	}
+}
+
+# permit GC telemetry for cloud-config-policy-engine
+cloud_config_policy_engine_services = [
+  "cloud-config-policy-engine",
+  "cloud-config-policy-engine-import-consumer",
+  "cloud-config-policy-engine-workflow-runner-bo",
+  "cloud-config-policy-engine-workflow-runner-fo",
+]
+if starts_with(.name, "go.gc.duration.seconds") {
+    service_name = string!(.tags.service)
+    if !includes(cloud_config_policy_engine_services, service_name) {
+        .tags.__should_drop = "true"
+    }
+}

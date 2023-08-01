@@ -1,0 +1,32 @@
+# https://docs.datadoghq.com/containers/kubernetes/data_collected/#kubernetes-state
+transforms:
+  k8s_metrics_events:
+    type: route
+    inputs:
+      - dd_agent_k8s.metrics
+    route:
+      k8s: .namespace == "kubernetes"
+      state: .namespace == "kubernetes_state"
+      container: .namespace == "container"
+      datadog: .namespace == "datadog"
+
+      # Ignore these namespaces for now
+      containerd: .namespace == "containerd"
+      system: .namespace == "system"
+      process: .namespace == "process"
+      helm: .namespace == "helm"
+      cri: .namespace == "cri"
+      coredns: .namespace == "coredns"
+      kube_apiserver: .namespace == "kube_apiserver"
+
+  remap_k8s_dd_agent:
+    type: remap
+    drop_on_abort: true
+    drop_on_error: true
+    reroute_dropped: true
+    inputs:
+      - k8s_metrics_events.k8s
+      - k8s_metrics_events.state
+      - k8s_metrics_events.container
+      - k8s_metrics_events.datadog
+    file: "${VRL_DIR}/1-remap-k8s-dd-agent.vrl"

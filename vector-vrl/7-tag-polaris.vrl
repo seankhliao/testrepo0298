@@ -1,0 +1,21 @@
+.tags."polaris.deployment_group" = get_env_var!("POLARIS_DEPLOYMENT_GROUP")
+.tags."polaris.deployment_option" = get_env_var!("POLARIS_DEPLOYMENT_OPTION")
+.tags."polaris.environment" = get_env_var!("POLARIS_ENVIRONMENT")
+.tags."polaris.instance" = get_env_var!("POLARIS_INSTANCE")
+.tags."polaris.region" = get_env_var!("POLARIS_REGION")
+.tags.source = "polaris-vector-metrics"
+# fix for collectorbank
+if .tags."polaris.instance" == "c-a" {
+    .tags."polaris.instance" = get_env_var!("POLARIS_ACCOUNT_NAME")
+}
+.tags.env = .tags."polaris.instance"
+
+# These are usually tags that are coming through with the associated
+# EC2 Instance's host tags.  You don't recognise them because AWS tags are
+# usually camel cased, e.g. `PolarisDeploymentGroup`.
+# Note: Even though we are rewriting camelCase to dotted notation in `standard_formatter`,
+# these tags are then reassociated back to the metric again in datadog.
+del(.tags."polarisdeploymentgroup")
+del(.tags."polarisdeploymentoption")
+del(.tags."polarisenvironment")
+del(.tags."polarisinstance")

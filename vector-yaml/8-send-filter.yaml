@@ -1,0 +1,9 @@
+transforms:
+  send_to_datadog:
+    type: route
+    inputs:
+      - polaris_tags
+
+    route:
+      enabled: |
+        "${PUSH_TO_DATADOG}" == "true"

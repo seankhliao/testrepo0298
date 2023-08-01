@@ -1,0 +1,46 @@
+receivers:
+  # (dog)statsd receiver
+  statsd:
+    endpoint: 0.0.0.0:8125
+    enable_metric_type: true
+    aggregation_interval: 10s
+    timer_histogram_mapping:
+      - statsd_type: histogram
+        observer_type: histogram
+      - statsd_type: timing
+        observer_type: histogram
+
+processors:
+  transform/tag-pipeline-statsd:
+    metric_statements:
+      - context: resource
+        statements:
+          - 'set(attributes["polaris.metrics.collector"], "otelcol-push")'
+          - 'set(attributes["polaris.metrics.receiver"], "statsd")'
+
+exporters:
+  # polaris-vector-metrics otelcol_statsd
+  datadog/vector-statsd:
+    api:
+      site: push.polaris-vector-metrics.svc.cluster.local:8004
+      key: required-field-but-not-used
+    metrics:
+      endpoint: http://push.polaris-vector-metrics.svc.cluster.local:8004
+      resource_attributes_as_tags: true
+      instrumentation_scope_metadata_as_tags: true
+    host_metadata:
+      enabled: false
+
+service:
+  pipelines:
+    # main export pipeline
+    metrics/statsd:
+      receivers:
+        - statsd
+      processors:
+        - k8sattributes
+        - cumulativetodelta
+        - transform/tag-pipeline-statsd
+        - batch
+      exporters:
+        - datadog/vector-statsd

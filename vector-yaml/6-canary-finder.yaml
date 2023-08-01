@@ -1,0 +1,7 @@
+transforms:
+  canary_finder:
+    type: filter
+    inputs:
+      - specialcase_to_drop_filter
+    condition: |
+      starts_with(string!(.name), "polaris.o11y.canary.")

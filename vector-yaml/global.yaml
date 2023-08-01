@@ -1,0 +1,9 @@
+api:
+  # Enabled to allow the usage of `vector top` command
+  enabled: true
+  address: 0.0.0.0:8686
+
+acknowledgements:
+  enabled: false
+
+data_dir: /vector-data-dir

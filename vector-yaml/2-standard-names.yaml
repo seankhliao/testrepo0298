@@ -1,0 +1,11 @@
+transforms:
+  standard_names:
+    type: remap
+    drop_on_abort: true
+    drop_on_error: true
+    reroute_dropped: true
+    inputs:
+      - remap_internal
+      - remap_k8s_dd_agent
+      - remap_main
+    file: "${VRL_DIR}/2-standard-names.vrl"

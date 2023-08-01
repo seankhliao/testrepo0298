@@ -1,0 +1,26 @@
+# filter tags for values containing UUIDs
+tags = object!(.tags || {})
+
+tags_with_uuid = filter(tags) -> |key,value| {
+    match!(value, r'[a-zA-Z0-9]{8}(-[a-zA-Z0-9]{4}){3}-[a-zA-Z0-9]{12}')
+}
+
+# get an array of tags mapping to values with UUIDs
+keys_with_uuid = keys(tags_with_uuid)
+keys_with_uuid = filter(keys_with_uuid) -> |_index,key| {
+    # known high cardinality
+    key != "k8s.pod.uid"
+}
+
+# turn array into logs messages for use with log_to_metric
+high_cardinality = map_values(keys_with_uuid) -> |tag| {
+    {
+        "tag": tag, # key
+        "value": 1
+    }
+}
+
+# serialize to json, .tags can only be strings, vector drops other fields
+if (length(high_cardinality) > 0) {
+    .tags.high_cardinality = encode_json(high_cardinality)
+}

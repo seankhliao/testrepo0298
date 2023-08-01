@@ -1,0 +1,45 @@
+receivers:
+  # self metrics
+  prometheus/self:
+    config:
+      scrape_configs:
+        - job_name: otelcol-self
+          scrape_interval: 5s
+          static_configs:
+            - targets:
+                - 127.0.0.1:8888
+
+processors:
+  # we don't need this label, it's a uuid
+  transform/cleanup-self:
+    metric_statements:
+      - context: datapoint
+        statements:
+          - 'delete_key(attributes, "service_instance_id")'
+
+exporters:
+  # loopback self metrics
+  otlp/self:
+    endpoint: ingest.polaris-otelcol-push.svc.cluster.local:4317
+    balancer_name: round_robin
+
+service:
+  pipelines:
+    # loopback self metrics
+    metrics/self:
+      receivers:
+        - prometheus/self
+      processors:
+        - cumulativetodelta
+        - transform/cleanup-self
+      exporters:
+        - otlp/self
+
+  telemetry:
+    logs:
+      level: error
+      encoding: json
+      disable_stacktrace: true
+    metrics:
+      level: normal
+      address: 0.0.0.0:8888

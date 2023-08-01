@@ -1,0 +1,48 @@
+sinks:
+  # https://vector.dev/docs/reference/configuration/sinks/datadog_metrics/
+  # Push internal_metrics for Vector agent to Datadog
+  # Known issue: https://github.com/vectordotdev/vector/issues/10870
+  datadog_metrics:
+    type: datadog_metrics
+    default_api_key: "${DD_API_KEY}"
+    site: "${DD_SITE}"
+    endpoint: "http://localhost:8090"
+    inputs:
+      - send_to_datadog.enabled
+
+    buffer:
+      max_events: 8000
+      when_full: drop_newest
+
+    request:
+      # value chosen from observing production instances
+      # increase pods count to scale
+      # disables adaptive concurrency
+      concurrency: 200
+
+    batch:
+      # if we don't limit this,
+      # it appears that Datdog will just close the connection on too large payloads
+      # Datadog payload limits are 5242880 bytes raw, 512000 compressed,
+      # but vector calculates sizes before serialization and compression
+      # https://docs.datadoghq.com/api/latest/metrics/#submit-metrics
+      max_events: 4000
+
+  prometheus:
+    type: prometheus_exporter
+    inputs:
+      - internal_metrics
+    address: 0.0.0.0:8888
+    buckets:
+      [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10, 25, 50, 100]
+
+  null_route:
+    type: blackhole
+    print_interval_secs: 0
+    inputs:
+      - k8s_metrics_events._unmatched
+      # route this here so we can tap if necessary
+      - polaris_tags.dropped
+      - send_to_datadog._unmatched
+      # drop it, only need it for debugging
+      - canary_finder

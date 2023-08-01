@@ -1,0 +1,20 @@
+transforms:
+  aggregate_generated_metrics:
+    type: aggregate
+    inputs:
+      - dropped_to_metric
+      - rejected_service_to_metric
+      - rejected_owner_to_metric
+      - uuid_finder_to_metric
+      - process_lag_to_metric
+    interval_ms: 5000
+
+  polaris_tags:
+    type: remap
+    drop_on_abort: true
+    drop_on_error: true
+    reroute_dropped: true
+    inputs:
+      - aggregate_generated_metrics
+      - specialcase_to_drop_filter
+    file: "${VRL_DIR}/7-tag-polaris.vrl"

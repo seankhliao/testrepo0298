@@ -1,0 +1,17 @@
+transforms:
+  specialcase_to_drop:
+    type: remap
+    drop_on_abort: true
+    drop_on_error: true
+    reroute_dropped: true
+    inputs:
+      - system_bypass_tags.system_metrics
+      - remove_standard_tags
+    file: "${VRL_DIR}/5-filter-special.vrl"
+
+  specialcase_to_drop_filter:
+    type: filter
+    inputs:
+      - specialcase_to_drop
+    condition: |
+      !exists(.tags.__should_drop)
